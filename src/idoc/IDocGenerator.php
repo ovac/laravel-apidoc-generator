@@ -3,12 +3,36 @@
 namespace OVAC\IDoc;
 
 use Illuminate\Routing\Route;
-use Mpociot\ApiDoc\Tools\Generator;
 use Mpociot\ApiDoc\Tools\ResponseResolver;
+use Mpociot\Reflection\DocBlock;
+use OVAC\IDoc\Tools\Traits\ParamHelpers;
 use ReflectionClass;
+use ReflectionMethod;
 
-class IDocGenerator extends Generator
+class IDocGenerator
 {
+    use ParamHelpers;
+
+    /**
+     * @param Route $route
+     *
+     * @return mixed
+     */
+    public function getUri(Route $route)
+    {
+        return $route->uri();
+    }
+
+    /**
+     * @param Route $route
+     *
+     * @return mixed
+     */
+    public function getMethods(Route $route)
+    {
+        return array_diff($route->methods(), ['HEAD']);
+    }
+
     /**
      * @param  \Illuminate\Routing\Route $route
      * @param array $apply Rules to apply when generating documentation for this route
@@ -93,6 +117,146 @@ class IDocGenerator extends Generator
             })->toArray();
 
         return $parameters;
+    }
+
+    /**
+     * @param array $tags
+     *
+     * @return array
+     */
+    protected function getBodyParametersFromDocBlock(array $tags)
+    {
+        $parameters = collect($tags)
+            ->filter(function ($tag) {
+                return $tag instanceof Tag && $tag->getName() === 'bodyParam';
+            })
+            ->mapWithKeys(function ($tag) {
+                preg_match('/(.+?)\s+(.+?)\s+(required\s+)?(.*)/', $tag->getContent(), $content);
+                if (empty($content)) {
+                    // this means only name and type were supplied
+                    list($name, $type) = preg_split('/\s+/', $tag->getContent());
+                    $required = false;
+                    $description = '';
+                } else {
+                    list($_, $name, $type, $required, $description) = $content;
+                    $description = trim($description);
+                    if ($description == 'required' && empty(trim($required))) {
+                        $required = $description;
+                        $description = '';
+                    }
+                    $required = trim($required) == 'required' ? true : false;
+                }
+
+                $type = $this->normalizeParameterType($type);
+                list($description, $example) = $this->parseDescription($description, $type);
+                $value = is_null($example) ? $this->generateDummyValue($type) : $example;
+
+                return [$name => compact('type', 'description', 'required', 'value')];
+            })->toArray();
+
+        return $parameters;
+    }
+
+    /**
+     * @param array $tags
+     *
+     * @return bool
+     */
+    protected function getAuthStatusFromDocBlock(array $tags)
+    {
+        $authTag = collect($tags)
+            ->first(function ($tag) {
+                return $tag instanceof Tag && strtolower($tag->getName()) === 'authenticated';
+            });
+
+        return (bool) $authTag;
+    }
+
+    /**
+     * @param ReflectionClass $controller
+     * @param ReflectionMethod $method
+     *
+     * @return string
+     */
+    protected function getRouteGroup(ReflectionClass $controller, ReflectionMethod $method)
+    {
+        // @group tag on the method overrides that on the controller
+        $docBlockComment = $method->getDocComment();
+        if ($docBlockComment) {
+            $phpdoc = new DocBlock($docBlockComment);
+            foreach ($phpdoc->getTags() as $tag) {
+                if ($tag->getName() === 'group') {
+                    return $tag->getContent();
+                }
+            }
+        }
+
+        $docBlockComment = $controller->getDocComment();
+        if ($docBlockComment) {
+            $phpdoc = new DocBlock($docBlockComment);
+            foreach ($phpdoc->getTags() as $tag) {
+                if ($tag->getName() === 'group') {
+                    return $tag->getContent();
+                }
+            }
+        }
+
+        return 'general';
+    }
+
+    /**
+     * @param array $tags
+     *
+     * @return array
+     */
+    protected function getQueryParametersFromDocBlock(array $tags)
+    {
+        $parameters = collect($tags)
+            ->filter(function ($tag) {
+                return $tag instanceof Tag && $tag->getName() === 'queryParam';
+            })
+            ->mapWithKeys(function ($tag) {
+                preg_match('/(.+?)\s+(.+?)\s+(required\s+)?(.*)/', $tag->getContent(), $content);
+                if (empty($content)) {
+                    // this means only name and type were supplied
+                    list($name, $type) = preg_split('/\s+/', $tag->getContent());
+                    $required = false;
+                    $description = '';
+                } else {
+                    list($_, $name, $type, $required, $description) = $content;
+                    $description = trim($description);
+                    if ($description == 'required' && empty(trim($required))) {
+                        $required = $description;
+                        $description = '';
+                    }
+                    $required = trim($required) == 'required' ? true : false;
+                }
+
+                $type = $this->normalizeParameterType($type);
+                list($description, $example) = $this->parseDescription($description, $type);
+                $value = is_null($example) ? $this->generateDummyValue($type) : $example;
+
+                return [$name => compact('type', 'description', 'required', 'value')];
+            })->toArray();
+
+        return $parameters;
+    }
+
+    /**
+     * @param ReflectionMethod $method
+     *
+     * @return array
+     */
+    protected function parseDocBlock(ReflectionMethod $method)
+    {
+        $comment = $method->getDocComment();
+        $phpdoc = new DocBlock($comment);
+
+        return [
+            'short' => $phpdoc->getShortDescription(),
+            'long' => $phpdoc->getLongDescription()->getContents(),
+            'tags' => $phpdoc->getTags(),
+        ];
     }
 
     private function normalizeParameterType($type)

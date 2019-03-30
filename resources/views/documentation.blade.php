@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>{{$title}}</title>
+    <title>{{config('idoc.title')}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
       @import url(//fonts.googleapis.com/css?family=Roboto:400,700);
@@ -25,12 +25,13 @@
     <script src="https://redocpro-cdn.redoc.ly/v1.0.0-beta.7/redocpro-standalone.min.js"></script>
     <script>
       RedocPro.init(
-        './openapi.json', {
+        "{{config('idoc.output') . "/openapi.json"}}", {
           "showConsole": true,
           "pathInMiddlePanel": true,
           "redocExport": "RedocPro",
           "layout": { "scope": "section" },
-          "unstable_externalDescription": "source/info.md"
+          "unstable_externalDescription": '{{route('idoc.info')}}',
+          "hideDownloadButton" : {{(bool) config('idoc.collections')}}
         },
         document.getElementById("redoc_container")
       );

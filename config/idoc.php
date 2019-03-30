@@ -3,9 +3,34 @@
 return [
 
     /*
-     * The output path for the generated documentation.
+     * Custom logo url.
      */
-    'output' => 'public/docs',
+    'logo' => 'https://res.cloudinary.com/ovac/image/upload/h_300,w_380,c_fill,r_30,bo_20px_solid_white/aboust_ey5v1v.jpg',
+
+    /*
+     * Custom logo url.
+     */
+    'color' => '',
+
+    /**
+     * Title of the docyment,
+     */
+    'title' => 'iDoc API Reference',
+
+    /**
+     * Api description
+     */
+    'description' => 'iDoc Api secification and documentation.',
+
+    /**
+     * The version for this documentation,
+     */
+    'version' => 'v1',
+
+    /**
+     * Documentation route.
+     */
+    'documentation-route' => 'idoc',
 
     /*
      * The router to be used (Laravel or Dingo).
@@ -17,15 +42,20 @@ return [
      */
     'collections' => true,
 
-    /**
-     * Title of the docyment,
+    /*
+     * The output path for the generated API collection file.
      */
-    'title' => ' iDoc API Reference',
+    'output' => '',
 
     /**
-     * Api description
+     * Servers to add to the documentatiopn
      */
-    'description' => 'iDoc Api secification and documentation.',
+    'servers' => [
+        [
+            'url' => config('app.url'),
+            'description' => 'Documentation generator server.',
+        ],
+    ],
 
     /*
      * The routes for which documentation should be generated.
@@ -152,17 +182,6 @@ return [
             ],
         ],
     ],
-
-    /*
-     * Custom logo path. Will be copied during generate command. Set this to false to use the default logo.
-     *
-     * Change to an absolute path to use your custom logo. For example:
-     * 'logo' => resource_path('views') . '/api/logo.png'
-     *
-     * If you want to use this, please be aware of the following rules:
-     * - size: 230 x 52
-     */
-    'logo' => public_path('img/logo.png'),
 
     'language-tabs' => [
         'bash' => 'Bash',

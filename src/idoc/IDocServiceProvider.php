@@ -13,19 +13,23 @@ class IDocServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        $this->loadViewsFrom(__DIR__ . '/../../resources/views/', 'idoc');
+
+        $this->mergeConfigFrom(__DIR__ . '/../../config/idoc.php', 'idoc');
         $this->loadTranslationsFrom(__DIR__ . '/../../resources/lang', 'idoc');
+        $this->loadViewsFrom(__DIR__ . '/../../resources/views/', 'idoc');
+        $this->loadRoutesFrom(__DIR__ . '/../../resources/routes/idoc.php', 'idoc');
 
         $this->publishes([
             __DIR__ . '/../../resources/lang' => $this->resourcePath('lang/vendor/idoc'),
+        ], 'idoc-language');
+
+        $this->publishes([
             __DIR__ . '/../../resources/views' => $this->resourcePath('views/vendor/idoc'),
         ], 'idoc-views');
 
         $this->publishes([
             __DIR__ . '/../../config/idoc.php' => app()->basePath() . '/config/idoc.php',
         ], 'idoc-config');
-
-        $this->mergeConfigFrom(__DIR__ . '/../../config/idoc.php', 'idoc');
 
         if ($this->app->runningInConsole()) {
             $this->commands([

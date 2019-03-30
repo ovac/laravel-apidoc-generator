@@ -5,11 +5,9 @@ namespace OVAC\IDoc;
 use Illuminate\Console\Command;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Collection;
-use Mpociot\ApiDoc\Postman\CollectionWriter;
-use Mpociot\ApiDoc\Tools\Generator;
-use Mpociot\ApiDoc\Tools\RouteMatcher;
-use Mpociot\Documentarian\Documentarian;
+use Illuminate\Support\Facades\File;
 use Mpociot\Reflection\DocBlock;
+use OVAC\IDoc\Tools\RouteMatcher;
 use ReflectionClass;
 use ReflectionException;
 
@@ -73,129 +71,18 @@ class IDocGeneratorCommand extends Command
      */
     private function writeMarkdown($parsedRoutes)
     {
-        $outputPath = config('idoc.output');
-        $infoFile = $outputPath . DIRECTORY_SEPARATOR . 'source' . DIRECTORY_SEPARATOR . 'info.md';
-        $targetFile = $outputPath . DIRECTORY_SEPARATOR . 'source' . DIRECTORY_SEPARATOR . 'index.md';
-        $compareFile = $outputPath . DIRECTORY_SEPARATOR . 'source' . DIRECTORY_SEPARATOR . '.compare.md';
-        $prependFile = $outputPath . DIRECTORY_SEPARATOR . 'source' . DIRECTORY_SEPARATOR . 'prepend.md';
-        $appendFile = $outputPath . DIRECTORY_SEPARATOR . 'source' . DIRECTORY_SEPARATOR . 'append.md';
+        $outputPath = public_path(config('idoc.output'));
 
-        $infoText = view('idoc::partials.info')
-            ->with('outputPath', ltrim($outputPath, 'public/'))
-            ->with('showPostmanCollectionButton', config('idoc.collections'));
-
-        // dd($parsedRoutes);
-        $parsedRouteOutput = $parsedRoutes->map(function ($routeGroup) {
-            return $routeGroup->map(function ($route) {
-                // dd($route);
-                $route['output'] = (string) view('idoc::partials.route')->with('route', $route)->render();
-
-                return $route;
-            });
-        });
-
-        $frontmatter = view('idoc::partials.frontmatter');
-        /*
-         * In case the target file already exists, we should check if the documentation was modified
-         * and skip the modified parts of the routes.
-         */
-        if (file_exists($targetFile) && file_exists($compareFile)) {
-            $generatedDocumentation = file_get_contents($targetFile);
-            $compareDocumentation = file_get_contents($compareFile);
-
-            if (preg_match('/---(.*)---\\s<!-- START_INFO -->/is', $generatedDocumentation, $generatedFrontmatter)) {
-                $frontmatter = trim($generatedFrontmatter[1], "\n");
-            }
-
-            $parsedRouteOutput->transform(function ($routeGroup) use ($generatedDocumentation, $compareDocumentation) {
-                return $routeGroup->transform(function ($route) use ($generatedDocumentation, $compareDocumentation) {
-                    if (preg_match('/<!-- START_' . $route['id'] . ' -->(.*)<!-- END_' . $route['id'] . ' -->/is', $generatedDocumentation, $existingRouteDoc)) {
-                        $routeDocumentationChanged = (preg_match('/<!-- START_' . $route['id'] . ' -->(.*)<!-- END_' . $route['id'] . ' -->/is', $compareDocumentation, $lastDocWeGeneratedForThisRoute) && $lastDocWeGeneratedForThisRoute[1] !== $existingRouteDoc[1]);
-                        if ($routeDocumentationChanged === false || $this->option('force')) {
-                            if ($routeDocumentationChanged) {
-                                $this->warn('Discarded manual changes for route [' . implode(',', $route['methods']) . '] ' . $route['uri']);
-                            }
-                        } else {
-                            $this->warn('Skipping modified route [' . implode(',', $route['methods']) . '] ' . $route['uri']);
-                            $route['modified_output'] = $existingRouteDoc[0];
-                        }
-                    }
-
-                    return $route;
-                });
-            });
+        if (!File::isDirectory($outputPath)) {
+            File::makeDirectory($outputPath, 0777, true, true);
         }
 
-        $prependFileContents = file_exists($prependFile)
-        ? file_get_contents($prependFile) . "\n" : '';
-        $appendFileContents = file_exists($appendFile)
-        ? "\n" . file_get_contents($appendFile) : '';
-
-        $documentarian = new Documentarian();
-
-        $markdown = view('idoc::documentarian')
-            ->with('writeCompareFile', false)
-            ->with('frontmatter', $frontmatter)
-            ->with('infoText', $infoText)
-            ->with('prependMd', $prependFileContents)
-            ->with('appendMd', $appendFileContents)
-            ->with('outputPath', config('idoc.output'))
-            ->with('showPostmanCollectionButton', config('idoc.collections'))
-            ->with('parsedRoutes', $parsedRouteOutput);
-
-        if (!is_dir($outputPath)) {
-            $documentarian->create($outputPath);
-        }
-
-        // Write output file
-        file_put_contents($targetFile, $markdown);
-
-        // Write comparable markdown file
-        $compareMarkdown = view('idoc::documentarian')
-            ->with('writeCompareFile', true)
-            ->with('frontmatter', $frontmatter)
-            ->with('infoText', $infoText)
-            ->with('prependMd', $prependFileContents)
-            ->with('appendMd', $appendFileContents)
-            ->with('outputPath', config('idoc.output'))
-            ->with('showPostmanCollectionButton', config('idoc.collections'))
-            ->with('parsedRoutes', $parsedRouteOutput);
-
-        file_put_contents($compareFile, $compareMarkdown);
-
-        $this->info('Wrote index.md to: ' . $outputPath);
-
-        $this->info('Generating API HTML code');
-
-        $documentarian->generate($outputPath);
-
-        $this->info('Wrote HTML documentation to: ' . $outputPath . '/index.html');
-
-        file_put_contents($infoFile, $infoText);
-
-        if (config('idoc.collections')) {
-            $collectionRoutes = $parsedRoutes;
-
-            $this->info('Generating Postman collection');
-            file_put_contents($outputPath . DIRECTORY_SEPARATOR . 'collection.json', $this->generatePostmanCollection($collectionRoutes));
-
-            $this->info('Generating OPEN API 3.0.0 Config');
-            file_put_contents($outputPath . DIRECTORY_SEPARATOR . 'openapi.json', $this->generateOpenApi3Config($parsedRoutes));
-
-            file_put_contents($outputPath . '/interractive.html', view('idoc::interractive')->with('title', config('idoc.title')));
-            $this->info('Wrote an interractive HTML documentation to: ' . $outputPath . '/interractive.html');
-        }
-
-        if ($logo = config('idoc.logo')) {
-            copy(
-                $logo,
-                $outputPath . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'logo.png'
-            );
-        }
+        $this->info('Generating OPEN API 3.0.0 Config');
+        file_put_contents($outputPath . DIRECTORY_SEPARATOR . 'openapi.json', $this->generateOpenApi3Config($parsedRoutes));
     }
 
     /**
-     * @param Generator $generator
+     * @param IDocGenerator $generator
      * @param array $routes
      *
      * @return array
@@ -256,20 +143,6 @@ class IDocGeneratorCommand extends Command
         }
 
         return true;
-    }
-
-    /**
-     * Generate Postman collection JSON file.
-     *
-     * @param Collection $routes
-     *
-     * @return string
-     */
-    private function generatePostmanCollection(Collection $routes)
-    {
-        $writer = new CollectionWriter($routes);
-
-        return $writer->getCollection();
     }
 
     /**
@@ -498,12 +371,12 @@ class IDocGeneratorCommand extends Command
 
             'info' => [
                 'title' => config('idoc.title'),
-                'version' => 'v5.0',
+                'version' => config('idoc.version'),
                 'description' => config('idoc.description'),
                 "x-logo" => [
-                    "url" => "/docs/images/logo.png",
+                    "url" => config('idoc.logo'),
                     "altText" => config('idoc.title'),
-                    "backgroundColor" => '',
+                    "backgroundColor" => config('idoc.color'),
                 ],
             ],
 
@@ -589,12 +462,7 @@ class IDocGeneratorCommand extends Command
                 })->filter(),
             ],
 
-            'servers' => [
-                [
-                    'url' => config('app.url'),
-                    'description' => 'Documentation generator server.',
-                ],
-            ],
+            'servers' => config('idoc.servers'),
 
             'paths' => $paths,
         ];
