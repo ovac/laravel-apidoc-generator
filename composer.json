@@ -1,5 +1,5 @@
 {
-    "name": "mpociot/laravel-apidoc-generator",
+    "name": "ovac/idoc",
     "license": "MIT",
     "description": "Generate beautiful API documentation from your Laravel application",
     "keywords": [
@@ -7,41 +7,33 @@
         "Documentation",
         "Laravel"
     ],
-    "homepage": "http://github.com/mpociot/laravel-apidoc-generator",
+    "homepage": "http://github.com/ovac/idoc",
     "authors": [
         {
-            "name": "Marcel Pociot",
-            "email": "m.pociot@gmail.com"
+            "name": "Victor Ariama (ovac4u)",
+            "email": "iamovac@gmail.com"
         }
     ],
     "require": {
-        "php": ">=5.5.0",
-        "fzaninotto/faker": "~1.0",
-        "laravel/framework": "~5.4",
-        "mpociot/documentarian": "^0.2.0",
-        "mpociot/reflection-docblock": "^1.0",
-        "ramsey/uuid": "^3.0"
+        "php": ">=7.0.0",
+        "mpociot/laravel-apidoc-generator": "^3.0"
     },
     "require-dev": {
-        "orchestra/testbench": "~3.0",
-        "phpunit/phpunit": "~4.0 || ~5.0",
-        "dingo/api": "1.0.*@dev",
-        "mockery/mockery": "^0.9.5"
+        "orchestra/testbench": "3.5.* || 3.6.* || 3.7.*",
+        "phpunit/phpunit": "^6.0.0 || ^7.4.0",
+        "dingo/api": "2.0.0-alpha1",
+        "mockery/mockery": "^1.2.0",
+        "league/fractal": "^0.17.0"
     },
     "autoload": {
-        "psr-0": {
-            "Mpociot\\ApiDoc": "src/"
-        }
-    },
-    "autoload-dev": {
         "psr-4": {
-            "Mpociot\\ApiDoc\\Tests\\": "tests/"
+            "OVAC\\IDoc\\": "src/idoc"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Mpociot\\ApiDoc\\ApiDocGeneratorServiceProvider"
+                "OVAC\\IDoc\\IDocServiceProvider"
             ]
        }
     }
